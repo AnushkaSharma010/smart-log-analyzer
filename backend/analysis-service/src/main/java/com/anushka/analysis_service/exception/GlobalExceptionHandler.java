@@ -32,4 +32,9 @@ public class GlobalExceptionHandler {
         return buildErrorResponse("An unexpected error occurred: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
+    @ExceptionHandler(FeignClientException.class)
+    public ResponseEntity<Map<String,Object>> handleFeignClientException(FeignClientException e){
+        return buildErrorResponse(e.getMessage(), HttpStatus.BAD_GATEWAY);
+    }
+
 }
