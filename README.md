@@ -18,8 +18,8 @@ Java 21 · Spring Boot 3 · Spring Cloud (Eureka, Gateway) · MySQL · MongoDB �
 - [x] Phase 1: Eureka discovery server + service registration
 - [x] Phase 2: API Gateway with path-based routing
 - [x] Phase 3: Log Service — file upload, MySQL persistence, CRUD
-- [ ] Phase 4: Analysis Service skeleton (MongoDB)
-- [ ] Phase 5: OpenFeign integration
+- [x] Phase 4: Analysis Service skeleton (MongoDB)
+- [x] Phase 5: OpenFeign integration
 - [ ] Phase 6: Strategy Pattern log parser
 - [ ] Phase 7: Spring AI integration
 - [ ] Phase 8: Resilience4j
