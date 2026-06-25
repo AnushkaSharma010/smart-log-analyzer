@@ -33,8 +33,8 @@ public class AnalysisController {
     } 
 
     @PostMapping("/trigger/{logId}")
-    public ResponseEntity<AnalysisResultDTO> triggerPlaceholderAnalysis(@PathVariable("logId") Long logId){
-        AnalysisResultDTO res = analysisResultService.createPlaceholderAnalysis(logId);
+    public ResponseEntity<AnalysisResultDTO> triggerAnalysis(@PathVariable("logId") Long logId){
+        AnalysisResultDTO res = analysisResultService.analyzeLog(logId);
         return ResponseEntity.status(HttpStatus.CREATED).body(res);
     }
 

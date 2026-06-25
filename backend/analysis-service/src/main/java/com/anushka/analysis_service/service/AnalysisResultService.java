@@ -14,7 +14,10 @@ import com.anushka.analysis_service.dto.ExceptionSummary;
 import com.anushka.analysis_service.dto.LogMetaDataDTO;
 import com.anushka.analysis_service.exception.AnalysisNotFoundException;
 import com.anushka.analysis_service.exception.FeignClientException;
+import com.anushka.analysis_service.parser.LogFileReader;
 import com.anushka.analysis_service.repository.AnalysisResultRepository;
+import com.anushka.analysis_service.strategy.LogParsingStrategy;
+import com.anushka.analysis_service.strategy.ParsedLogResult;
 
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +30,8 @@ public class AnalysisResultService {
 
     private final AnalysisResultRepository repository;
     private final LogServiceClient logServiceClient;
+    private final LogFileReader logFileReader;
+    private final LogParsingStrategy logParsingStrategy;
     
     private AnalysisResultDTO mapToDTO(AnalysisResult result){
         List<ExceptionSummary> summary = result.getExceptions() == null ? List.of() :
@@ -73,40 +78,38 @@ public class AnalysisResultService {
         return repository.existsByLogId(logId);
     }
 
-    /**
-     * TEMPORARY placeholder method for Phase 4.
-     * Real parsing logic (Strategy Pattern) replaces this in Phase 6.
-     * For now, this proves the MongoDB write path works end-to-end.
-     */
-    public AnalysisResultDTO createPlaceholderAnalysis(Long logId) {
+    public AnalysisResultDTO analyzeLog(Long logId) {
         LogMetaDataDTO logMetadata = fetchLogMetadata(logId);
-        log.info("Fetched log metadata via Feign: {}", logMetadata.getOriginalFileName());
+        log.info("Starting analysis for logId: {} (file: {})", logId, logMetadata.getOriginalFileName());
+
+        List<String> logLines = logFileReader.readLines(logMetadata.getStoredFilePath());
+        ParsedLogResult parsedResult = logParsingStrategy.parse(logLines);
+
         AnalysisResult result = AnalysisResult.builder()
                 .logId(logId)
-                .totalErrors(2)
-                .totalWarnings(1)
-                .totalInfos(5)
-                .exceptions(List.of(
-                        AnalysisResult.ExceptionDetail.builder()
-                                .type("NullPointerException")
-                                .count(2)
-                                .firstOccurrence("2026-06-18T10:16:02")
-                                .build()
-                ))
-                .stackTraces(List.of(
-                        "java.lang.NullPointerException at OrderService.java:142"
-                ))
-                .severityBreakdown(Map.of("ERROR", 2, "WARN", 1, "INFO", 5))
-                .analysisStrategy("PLACEHOLDER")
+                .totalErrors(parsedResult.getTotalErrors())
+                .totalWarnings(parsedResult.getTotalWarnings())
+                .totalInfos(parsedResult.getTotalInfos())
+                .exceptions(parsedResult.getExceptions().stream()
+                        .map(e -> AnalysisResult.ExceptionDetail.builder()
+                                .type(e.getType())
+                                .count(e.getCount())
+                                .firstOccurrence(e.getFirstOccurrence())
+                                .build())
+                        .toList())
+                .stackTraces(parsedResult.getStackTraces())
+                .severityBreakdown(parsedResult.getSeverityBreakdown())
+                .analysisStrategy(logParsingStrategy.getStrategyName())
                 .analysisAt(LocalDateTime.now())
                 .build();
 
         AnalysisResult saved = repository.save(result);
-        log.info("Placeholder analysis created for logId: {} (file: {})", logId, logMetadata.getOriginalFileName());
+        log.info("Analysis saved for logId: {} — {} errors, {} warnings, {} unique exceptions",
+                logId, parsedResult.getTotalErrors(), parsedResult.getTotalWarnings(),
+                parsedResult.getExceptions().size());
 
         return mapToDTO(saved);
     }
-
     public void deleteByLogId(Long logId) {
         AnalysisResult result = repository.findByLogId(logId)
                 .orElseThrow(() -> new AnalysisNotFoundException(
