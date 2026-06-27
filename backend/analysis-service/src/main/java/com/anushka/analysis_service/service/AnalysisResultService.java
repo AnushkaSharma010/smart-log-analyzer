@@ -35,6 +35,7 @@ public class AnalysisResultService {
     private final LogFileReader logFileReader;
     private final LogParsingStrategy logParsingStrategy;
     private final RootCauseAnalyzer rootCauseAnalyzer;
+    private final ResilientLogServiceCaller resilientLogServiceCaller;
     
     private AnalysisResultDTO mapToDTO(AnalysisResult result){
         List<ExceptionSummary> summary = result.getExceptions() == null ? List.of() :
@@ -101,7 +102,7 @@ public class AnalysisResultService {
 }
 
     private AnalysisResultDTO performAnalysis(Long logId) {
-        LogMetaDataDTO logMetadata = fetchLogMetadata(logId);
+        LogMetaDataDTO logMetadata = resilientLogServiceCaller.fetchLogMetadata(logId);
         log.info("Starting analysis for logId: {} (file: {})", logId, logMetadata.getOriginalFileName());
 
         List<String> logLines = logFileReader.readLines(logMetadata.getStoredFilePath());
