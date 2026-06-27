@@ -3,10 +3,12 @@ package com.anushka.analysis_service.service;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
+import com.anushka.analysis_service.ai.RootCauseAnalyzer;
 import com.anushka.analysis_service.client.LogServiceClient;
 import com.anushka.analysis_service.document.AnalysisResult;
 import com.anushka.analysis_service.dto.AnalysisResultDTO;
@@ -32,6 +34,7 @@ public class AnalysisResultService {
     private final LogServiceClient logServiceClient;
     private final LogFileReader logFileReader;
     private final LogParsingStrategy logParsingStrategy;
+    private final RootCauseAnalyzer rootCauseAnalyzer;
     
     private AnalysisResultDTO mapToDTO(AnalysisResult result){
         List<ExceptionSummary> summary = result.getExceptions() == null ? List.of() :
@@ -53,6 +56,7 @@ public class AnalysisResultService {
         .severityBreakdown(result.getSeverityBreakdown())
         .analysisStrategy(result.getAnalysisStrategy())
         .analysisAt(result.getAnalysisAt())
+        .aiInsight(result.getAiInsight())
         .build();
     }
 
@@ -78,12 +82,31 @@ public class AnalysisResultService {
         return repository.existsByLogId(logId);
     }
 
-    public AnalysisResultDTO analyzeLog(Long logId) {
+    public AnalysisResultDTO analyzeLog(Long logId){
+        Optional<AnalysisResult> existing = repository.findByLogId(logId);
+    if (existing.isPresent()) {
+        log.info("Analysis already exists for logId: {} — returning cached result", logId);
+        return mapToDTO(existing.get());
+    }
+    return performAnalysis(logId);
+    }
+
+    public AnalysisResultDTO reanalyzeLog(Long logId) {
+    repository.findByLogId(logId).ifPresent(existing -> {
+        log.info("Forcing re-analysis for logId: {} — removing previous result", logId);
+        repository.delete(existing);
+    });
+
+    return performAnalysis(logId);
+}
+
+    private AnalysisResultDTO performAnalysis(Long logId) {
         LogMetaDataDTO logMetadata = fetchLogMetadata(logId);
         log.info("Starting analysis for logId: {} (file: {})", logId, logMetadata.getOriginalFileName());
 
         List<String> logLines = logFileReader.readLines(logMetadata.getStoredFilePath());
         ParsedLogResult parsedResult = logParsingStrategy.parse(logLines);
+        String aiInsight = rootCauseAnalyzer.generateInsight(parsedResult);
 
         AnalysisResult result = AnalysisResult.builder()
                 .logId(logId)
@@ -101,6 +124,7 @@ public class AnalysisResultService {
                 .severityBreakdown(parsedResult.getSeverityBreakdown())
                 .analysisStrategy(logParsingStrategy.getStrategyName())
                 .analysisAt(LocalDateTime.now())
+                .aiInsight(aiInsight)
                 .build();
 
         AnalysisResult saved = repository.save(result);

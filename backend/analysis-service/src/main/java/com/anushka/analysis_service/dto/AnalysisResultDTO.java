@@ -25,5 +25,6 @@ public class AnalysisResultDTO {
     private Map<String,Integer> severityBreakdown;
     private String analysisStrategy;
     private LocalDateTime analysisAt;
+    private String aiInsight;
     
 }

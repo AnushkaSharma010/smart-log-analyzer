@@ -38,6 +38,13 @@ public class AnalysisController {
         return ResponseEntity.status(HttpStatus.CREATED).body(res);
     }
 
+
+@PostMapping("/reanalyze/{logId}")
+public ResponseEntity<AnalysisResultDTO> reanalyzeLog(@PathVariable("logId") Long logId) {
+    AnalysisResultDTO result = analysisResultService.reanalyzeLog(logId);
+    return ResponseEntity.status(HttpStatus.OK).body(result);
+}
+
     @DeleteMapping("/{logId}")
     public ResponseEntity<Void> deleteAnalysis(@PathVariable("logId") Long logId){
         analysisResultService.deleteByLogId(logId);

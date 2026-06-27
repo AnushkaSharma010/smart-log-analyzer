@@ -37,6 +37,7 @@ public class AnalysisResult {
 
     private String analysisStrategy;
     private LocalDateTime analysisAt;
+    private String aiInsight;
 
 
     @Data
