@@ -26,6 +26,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleGeneralException(Exception ex) {
         return buildResponseEntity("An unexpected error occurred: " + ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
     }
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+public ResponseEntity<Map<String, Object>> handleMaxUploadSizeExceeded(
+        org.springframework.web.multipart.MaxUploadSizeExceededException ex) {
+    return buildResponseEntity(
+            "File size exceeds the maximum supported limit of 100MB. Please upload a smaller file or split large logs before uploading.",
+            HttpStatus.BAD_REQUEST
+    );
+}
     
     private ResponseEntity<Map<String, Object>> buildResponseEntity(String message, HttpStatus status){
         Map<String, Object> body = new HashMap<>();

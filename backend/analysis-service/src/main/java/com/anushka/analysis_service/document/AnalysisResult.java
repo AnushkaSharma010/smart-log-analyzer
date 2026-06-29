@@ -32,7 +32,6 @@ public class AnalysisResult {
     private int totalInfos;
 
     private List<ExceptionDetail> exceptions;
-    private List<String> stackTraces;
     private Map<String,Integer> severityBreakdown;
 
     private String analysisStrategy;
@@ -46,8 +45,10 @@ public class AnalysisResult {
     @Builder
     public static class ExceptionDetail {
         private String type;
+        private String message;
         private int count;
         private String firstOccurrence;
+        private String sampleStackTrace;
     }
     
 }

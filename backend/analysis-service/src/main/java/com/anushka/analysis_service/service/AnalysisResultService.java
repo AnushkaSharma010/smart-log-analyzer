@@ -41,8 +41,10 @@ public class AnalysisResultService {
         List<ExceptionSummary> summary = result.getExceptions() == null ? List.of() :
         result.getExceptions().stream().map(e -> ExceptionSummary.builder()
         .type(e.getType())
+        .message(e.getMessage())
         .count(e.getCount())
         .firstOccurrence(e.getFirstOccurrence())
+        .sampleStackTrace(e.getSampleStackTrace())
         .build())
         .collect(Collectors.toList());
 
@@ -52,7 +54,6 @@ public class AnalysisResultService {
         .totalErrors(result.getTotalErrors())
         .totalInfos(result.getTotalInfos())
         .totalWarnings(result.getTotalWarnings())
-        .stackTraces(result.getStackTraces())
         .exceptions(summary)
         .severityBreakdown(result.getSeverityBreakdown())
         .analysisStrategy(result.getAnalysisStrategy())
@@ -117,11 +118,12 @@ public class AnalysisResultService {
                 .exceptions(parsedResult.getExceptions().stream()
                         .map(e -> AnalysisResult.ExceptionDetail.builder()
                                 .type(e.getType())
+                                .message(e.getMessage())
                                 .count(e.getCount())
                                 .firstOccurrence(e.getFirstOccurrence())
+                                .sampleStackTrace(e.getSampleStackTrace())
                                 .build())
                         .toList())
-                .stackTraces(parsedResult.getStackTraces())
                 .severityBreakdown(parsedResult.getSeverityBreakdown())
                 .analysisStrategy(logParsingStrategy.getStrategyName())
                 .analysisAt(LocalDateTime.now())

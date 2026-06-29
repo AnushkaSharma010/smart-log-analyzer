@@ -43,6 +43,12 @@ public class LogStorageService {
             throw new RuntimeException("Failed to store file", e);
         }
     }
+     // Capped at 100MB: current parser (Analysis Service) reads the full file into
+        // memory via Files.readAllLines(). Beyond this size, heap pressure under
+        // concurrent uploads becomes a real risk on a single-instance JVM. The next
+        // architectural step for genuinely larger files is streaming line-by-line
+        // parsing instead of full in-memory loading.
+        private static final long maxSizeBytes = 100 * 1024 * 1024; // 100 MB
     private void validateFile(MultipartFile file) {
         if (file.isEmpty()) {
             throw new InvalidFileException("Uploaded file is empty");
@@ -53,9 +59,15 @@ public class LogStorageService {
             throw new InvalidFileException("Only .log and .txt files are supported");
         }
 
-        long maxSizeBytes = 10 * 1024 * 1024; // 10 MB
+       
         if (file.getSize() > maxSizeBytes) {
-            throw new InvalidFileException("File size exceeds 10MB limit");
+            double uploadedMB = file.getSize() / (1024.0 * 1024.0);
+        double limitMB = maxSizeBytes / (1024.0 * 1024.0);
+        throw new InvalidFileException(
+                String.format("File size (%.1fMB) exceeds the maximum supported limit of %.0fMB. " +
+                                "Please upload a smaller file or split large logs before uploading.",
+                        uploadedMB, limitMB)
+        );
         }
     }
     

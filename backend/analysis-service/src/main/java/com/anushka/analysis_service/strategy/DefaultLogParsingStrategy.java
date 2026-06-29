@@ -16,8 +16,6 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class DefaultLogParsingStrategy implements LogParsingStrategy {
 
-     
-
     // Matches lines like: 2026-06-18 10:16:02 ERROR [thread-name] com.example.Class - message
     private static final Pattern LOG_LINE_PATTERN = Pattern.compile(
             "^(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})\\s+(ERROR|WARN|INFO|DEBUG)\\s+.*"
@@ -33,26 +31,36 @@ public class DefaultLogParsingStrategy implements LogParsingStrategy {
             "^\\s+at\\s+.*"
     );
 
+     private static class ExceptionAggregate {
+        String type;
+        String firstMessage;
+        String firstOccurrence;
+        String firstStackTrace;
+        int count = 0;
+    }
+
     @Override
     public ParsedLogResult parse(List<String> logLines) {
         int errorCount =0;
         int warnCount =0;
         int infoCount =0;
-
-        Map<String,Integer> exceptionCount = new LinkedHashMap<>();
-        Map<String,String> exceptionFirstOccurrence = new HashMap<>();
-        List<String> stackTrace = new ArrayList<>();
-
+        
+        // Key = exception type, value = running aggregate for that type
+        Map<String, ExceptionAggregate> exceptionAggregates = new LinkedHashMap<>();
+       
         String currentTimeStamp = null;
+        String currentExceptionType = null;
+        String currentExceptionMessage = null;
         StringBuilder currentStackTrace = null;
 
          for (String line : logLines) {
             Matcher logLineMatcher = LOG_LINE_PATTERN.matcher(line);
 
             if (logLineMatcher.matches()) {
-                // A new log entry starts — flush any in-progress stack trace first
-                flushStackTrace(currentStackTrace, stackTrace);
+                flushCurrentException(exceptionAggregates, currentExceptionType,
+                        currentExceptionMessage, currentTimeStamp, currentStackTrace);
                 currentStackTrace = null;
+                currentExceptionType = null;
 
                 currentTimeStamp = logLineMatcher.group(1);
                 String severity = logLineMatcher.group(2);
@@ -61,33 +69,37 @@ public class DefaultLogParsingStrategy implements LogParsingStrategy {
                     case "ERROR" -> errorCount++;
                     case "WARN" -> warnCount++;
                     case "INFO" -> infoCount++;
-                    default -> { /* DEBUG and others not counted separately for now */ }
+                    default -> { }
                 }
 
             } else if (STACK_TRACE_LINE_PATTERN.matcher(line).matches() && currentStackTrace != null) {
-                // Continuation of an existing stack trace
                 currentStackTrace.append("\n").append(line);
 
             } else {
                 Matcher exceptionMatcher = EXCEPTION_PATTERN.matcher(line.trim());
                 if (exceptionMatcher.matches()) {
-                    String exceptionType = exceptionMatcher.group(1);
-                    exceptionCount.merge(exceptionType, 1, Integer::sum);
-                    exceptionFirstOccurrence.putIfAbsent(exceptionType, currentTimeStamp);
+                    // A new exception starts — flush whatever exception we were building before
+                    flushCurrentException(exceptionAggregates, currentExceptionType,
+                            currentExceptionMessage, currentTimeStamp, currentStackTrace);
 
-                    flushStackTrace(currentStackTrace, stackTrace);
+                    currentExceptionType = exceptionMatcher.group(1);
+                    currentExceptionMessage = exceptionMatcher.group(2);
                     currentStackTrace = new StringBuilder(line);
                 }
             }
         }
 
-        flushStackTrace(currentStackTrace, stackTrace);
+        // Flush whatever was being built at end of file
+        flushCurrentException(exceptionAggregates, currentExceptionType,
+                currentExceptionMessage, currentTimeStamp, currentStackTrace);
 
-        List<ParsedLogResult.ExceptionInfo> exceptions = exceptionCount.entrySet().stream()
-                .map(entry -> ParsedLogResult.ExceptionInfo.builder()
-                        .type(entry.getKey())
-                        .count(entry.getValue())
-                        .firstOccurrence(exceptionFirstOccurrence.get(entry.getKey()))
+        List<ParsedLogResult.ExceptionInfo> exceptions = exceptionAggregates.values().stream()
+                .map(agg -> ParsedLogResult.ExceptionInfo.builder()
+                        .type(agg.type)
+                        .message(agg.firstMessage)
+                        .count(agg.count)
+                        .firstOccurrence(agg.firstOccurrence)
+                        .sampleStackTrace(agg.firstStackTrace)
                         .build())
                 .toList();
 
@@ -104,15 +116,27 @@ public class DefaultLogParsingStrategy implements LogParsingStrategy {
                 .totalWarnings(warnCount)
                 .totalInfos(infoCount)
                 .exceptions(exceptions)
-                .stackTraces(stackTrace)
                 .severityBreakdown(severityBreakdown)
                 .build();
     }
 
-    private void flushStackTrace(StringBuilder currentStackTrace, List<String> stackTraces) {
-        if (currentStackTrace != null && currentStackTrace.length() > 0) {
-            stackTraces.add(currentStackTrace.toString());
+    private void flushCurrentException(Map<String, ExceptionAggregate> aggregates,
+                                        String type, String message,
+                                        String timestamp, StringBuilder stackTrace) {
+        if (type == null) {
+            return;
         }
+
+        ExceptionAggregate agg = aggregates.computeIfAbsent(type, t -> {
+            ExceptionAggregate newAgg = new ExceptionAggregate();
+            newAgg.type = t;
+            newAgg.firstMessage = message;
+            newAgg.firstOccurrence = timestamp;
+            newAgg.firstStackTrace = stackTrace != null ? stackTrace.toString() : null;
+            return newAgg;
+        });
+
+        agg.count++;
     }
     
 

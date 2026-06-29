@@ -21,7 +21,6 @@ public class AnalysisResultDTO {
     private int totalWarnings;
     private int totalInfos;
     private List<ExceptionSummary> exceptions;
-    private List<String> stackTraces;
     private Map<String,Integer> severityBreakdown;
     private String analysisStrategy;
     private LocalDateTime analysisAt;

@@ -21,6 +21,9 @@ spring:
               uri: lb://analysis-service
               predicates:
                 - Path=/api/analysis/**
+  http:
+    codecs:
+      max-in-memory-size: 100MB
 
 eureka:
   client:

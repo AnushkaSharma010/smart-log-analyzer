@@ -12,7 +12,9 @@ import lombok.NoArgsConstructor;
 public class ExceptionSummary {
 
     private String type;
+    private String message;
     private int count;
     private String firstOccurrence;
+    private String sampleStackTrace;
     
 }

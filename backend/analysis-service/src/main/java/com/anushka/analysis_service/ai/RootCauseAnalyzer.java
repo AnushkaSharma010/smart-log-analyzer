@@ -1,5 +1,8 @@
 package com.anushka.analysis_service.ai;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
 
@@ -21,18 +24,31 @@ public class RootCauseAnalyzer {
     }
     
     @CircuitBreaker(name = "mistralAi", fallbackMethod = "fallbackInsight")
-    public String generateInsight(ParsedLogResult parsedResult){
-        if(parsedResult.getExceptions() == null || parsedResult.getExceptions().isEmpty()){
+    public String generateInsight(ParsedLogResult parsedResult) {
+        if (parsedResult.getExceptions() == null || parsedResult.getExceptions().isEmpty()) {
             log.info("No exceptions found — skipping AI insight generation");
             return "No exceptions detected in this log file. No root cause analysis needed.";
         }
-        
-            String prompt = promptBuilder.buildRootCausePrompt(parsedResult);
-            String response = chatClient.prompt().user(prompt).call().content();
-            log.info("AI insight generated successfully ({} chars)", response.length());
-            return response;
-        
+
+        List<String> prompts = promptBuilder.buildRootCausePrompts(parsedResult);
+        log.info("Generated {} prompt batch(es) covering {} distinct exception types",
+                prompts.size(), parsedResult.getExceptions().size());
+
+        List<String> batchResponses = prompts.stream()
+                .map(prompt -> chatClient.prompt().user(prompt).call().content())
+                .toList();
+
+        return combineBatchResponses(batchResponses);
     }
+
+    private String combineBatchResponses(List<String> batchResponses) {
+        if (batchResponses.size() == 1) {
+            return batchResponses.get(0);
+        }
+        return batchResponses.stream()
+                .collect(Collectors.joining("\n\n"));
+    }
+
     private String fallbackInsight(ParsedLogResult parsedResult, Throwable throwable) {
         log.error("AI insight generation failed — circuit breaker fallback triggered. Reason: {}",
                 throwable.getMessage());

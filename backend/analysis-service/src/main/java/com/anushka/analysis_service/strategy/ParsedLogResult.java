@@ -19,7 +19,6 @@ public class ParsedLogResult {
     private int totalInfos;
 
     private List<ExceptionInfo> exceptions;
-    private List<String> stackTraces;
     private Map<String,Integer> severityBreakdown;
 
     @Data
@@ -28,8 +27,10 @@ public class ParsedLogResult {
     @Builder
     public static class ExceptionInfo {
         private String type;
+        private String message;
         private int count;
         private String firstOccurrence;
+        private String sampleStackTrace;
     }
 
     
